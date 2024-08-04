@@ -59,13 +59,13 @@ class FilesController {
     if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
     const parentId = req.query.parentId || "0";
-    const files = await dbClient.getFilesForUser(userId, parentId);
     const page = req.query.page;
     
     if (page) {
-      const pageData = FilesManager.paginate(files, page);
+      const pageData = await dbClient.getPageFilesForUser(userId, parentId, page);
       return res.status(200).json(pageData);
     } else {
+      const files = await dbClient.getFilesForUser(userId, parentId);
       return res.status(200).json(files);
     }
   }

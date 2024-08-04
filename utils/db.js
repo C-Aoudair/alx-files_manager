@@ -84,6 +84,19 @@ class DBClient {
     return files;
   }
 
+  async getPageFilesForUser(userId, parentId, page) {
+    const query = {
+      userId: new ObjectId(userId),
+      parentId: parentId === "0" ? "0" : new ObjectId(parentId),
+    };
+    const files = await this.getCollection("files")
+      .find(query)
+      .skip(page * 20)
+      .limit(20)
+      .toArray();
+    return files;
+  }
+
   async createFile(name, type, userId, parentId = "0", isPublic = false) {
     const fileData = {
       name,
