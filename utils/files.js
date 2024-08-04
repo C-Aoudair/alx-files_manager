@@ -17,6 +17,14 @@ class FilesManager {
 
     return { filePath };
   }
+
+  static paginate(file, page) {
+    const limit = 20;
+    const start = page * limit;
+    const end = start + limit;
+
+    return file.slice(start, end);
+  }
 }
 
 export default FilesManager;

@@ -10,75 +10,90 @@ class DBClient {
     this.client = new MongoClient(`mongodb://${this.host}:${this.port}`, {
       useUnifiedTopology: true,
     });
-    this.client
-      .connect()
-      .then(() => (this.isConnected = true))
-      .catch((error) => console.log(error));
+
+    this.connect();
   }
 
-  isAlive = () => this.isConnected;
+  async connect() {
+    try {
+      await this.client.connect();
+      this.isConnected = true;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  isAlive() {
+    return this.isConnected;
+  }
+
+  getCollection(collectionName) {
+    return this.client.db(this.database).collection(collectionName);
+  }
+
+  async countDocuments(collectionName) {
+    return this.getCollection(collectionName).countDocuments();
+  }
+
+  async findOne(collectionName, query) {
+    return this.getCollection(collectionName).findOne(query);
+  }
+
+  async insertOne(collectionName, document) {
+    return this.getCollection(collectionName).insertOne(document);
+  }
 
   nbUsers() {
-    return this.client.db(this.database).collection("users").countDocuments();
+    return this.countDocuments("users");
   }
 
   nbFiles() {
-    return this.client.db(this.database).collection("files").countDocuments();
+    return this.countDocuments("files");
   }
 
   isUserExist(email) {
-    return this.client.db(this.database).collection("users").findOne({ email });
+    return this.findOne("users", { email });
   }
 
   async createUser(email, password) {
-    const result = await this.client
-      .db(this.database)
-      .collection("users")
-      .insertOne({ email, password: sha1(password) });
-
+    const result = await this.insertOne("users", {
+      email,
+      password: sha1(password),
+    });
     return { id: result.insertedId, email };
   }
 
-  async getUser(email) {
-    const user = await this.client
-      .db(this.database)
-      .collection("users")
-      .findOne({ email });
-
-    return user;
+  getUser(email) {
+    return this.findOne("users", { email });
   }
 
-  async getUserById(userId) {
-    const result = await this.client
-      .db(this.database)
-      .collection("users")
-      .findOne({ _id: new ObjectId(userId) });
-
-    return { id: result._id, email: result.email };
+  getUserById(userId) {
+    return this.findOne("users", { _id: new ObjectId(userId) });
   }
 
-  async getFiles(fileId) {
-    const result = await this.client
-      .db(this.database)
-      .collection("files")
-      .findOne({ _id: new ObjectId(fileId) });
-
-    return result;
+  getFile(fileId) {
+    return this.findOne("files", { _id: new ObjectId(fileId) });
   }
 
-  async createFile(name, type, userId, parentId = 0, isPublic = false) {
-    const result = await this.client
-      .db(this.database)
-      .collection("files")
-      .insertOne({
-        name,
-        type,
-        userId: new ObjectId(userId),
-        parentId: new ObjectId(parentId),
-        isPublic,
-      });
+  async getFilesForUser(userId, parentId) {
+    const query = {
+      userId: new ObjectId(userId),
+      parentId: parentId === "0" ? "0" : new ObjectId(parentId),
+    };
+    const files = await this.getCollection("files").find(query).toArray();
+    return files;
+  }
 
-    return { id: result.insertedId, name, type, userId, parentId, isPublic };
+  async createFile(name, type, userId, parentId = "0", isPublic = false) {
+    const fileData = {
+      name,
+      type,
+      userId: new ObjectId(userId),
+      parentId: parentId === "0" ? "0" : new ObjectId(parentId),
+      isPublic,
+    };
+    const result = await this.insertOne("files", fileData);
+    return { id: result.insertedId, ...fileData };
   }
 }
 

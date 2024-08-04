@@ -5,50 +5,68 @@ import FilesManager from "../utils/files";
 class FilesController {
   static async postUpload(req, res) {
     const token = req.headers["x-token"];
-    if (!token) return res.status(401).send({ error: "Unauthorized" });
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
 
     const userId = await redisClient.get(`auth_${token}`);
-    if (!userId) return res.status(401).send({ error: "Unauthorized" });
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-    const { name } = req.body;
-    if (!name) return res.status(400).send({ error: "Missing name" });
-
-    const { type, parentId } = req.body;
-    if (!type || (type !== "folder" && type !== "file" && type !== "image"))
-      return res.status(400).send({ error: "Missing type" });
+    const { name, type, parentId, data, isPublic } = req.body;
+    if (!name) return res.status(400).json({ error: "Missing name" });
+    if (!type || !["folder", "file", "image"].includes(type))
+      return res.status(400).json({ error: "Invalid type" });
 
     if (parentId) {
-      const parent = await dbClient.getFiles(parentId);
-      if (!parent) return res.status(400).send({ error: "Parent not found" });
-
+      const parent = await dbClient.getFile(parentId);
+      if (!parent) return res.status(400).json({ error: "Parent not found" });
       if (parent.type !== "folder")
-        return res.status(400).send({ error: "Parent is not a folder" });
+        return res.status(400).json({ error: "Parent is not a folder" });
     }
 
-    const { data, isPublic } = req.body;
-    if (!data && type !== "folder")
-      return res.status(400).send({ error: "Missing data" });
+    if (type !== "folder" && !data)
+      return res.status(400).json({ error: "Missing data" });
 
-    if (type === "folder") {
-      const result = await dbClient.createFile(
-        name,
-        type,
-        userId,
-        parentId,
-        isPublic,
-      );
-      return res.status(201).send(result);
+    const fileData = {
+      name,
+      type,
+      userId,
+      parentId,
+      isPublic,
+      localPath: type !== "folder" ? FilesManager.createFile(data) : undefined,
+    };
+    const result = await dbClient.createFile(fileData);
+    return res.status(201).json(result);
+  }
+
+  static async getShow(req, res) {
+    const token = req.headers["x-token"];
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const { id } = req.params;
+    const file = await dbClient.getFileForUser(userId, id);
+    if (!file) return res.status(404).json({ error: "Not found" });
+
+    return res.status(200).json(file);
+  }
+
+  static async getIndex(req, res) {
+    const token = req.headers["x-token"];
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+    const userId = await redisClient.get(`auth_${token}`);
+    if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+    const parentId = req.query.parentId || "0";
+    const files = await dbClient.getFilesForUser(userId, parentId);
+    const page = req.query.page;
+    
+    if (page) {
+      const pageData = FilesManager.paginate(files, page);
+      return res.status(200).json(pageData);
     } else {
-      const localPath = FilesManager.createFile(data);
-      const result = await dbClient.createFile(
-        name,
-        type,
-        userId,
-        parentId,
-        isPublic,
-        localPath,
-      );
-      return res.status(201).send(result);
+      return res.status(200).json(files);
     }
   }
 }
