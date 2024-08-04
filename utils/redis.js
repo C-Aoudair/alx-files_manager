@@ -29,12 +29,10 @@ class RedisClient {
     this.connected = false;
   }
 
-  // Improved check for connection status
   isAlive() {
     return this.connected;
   }
 
-  // Wrap Redis methods to return promises
   async get(key) {
     try {
       return await this.asyncGet(key);

@@ -1,12 +1,12 @@
-import { MongoClient, ObjectId } from "mongodb";
-import sha1 from "sha1";
+import { MongoClient, ObjectId } from 'mongodb';
+import sha1 from 'sha1';
 
 class DBClient {
   constructor() {
     this.isConnected = false;
-    this.host = process.env.DB_HOST || "localhost";
+    this.host = process.env.DB_HOST || 'localhost';
     this.port = process.env.DB_PORT || 27017;
-    this.database = process.env.DB_DATABASE || "files_manager";
+    this.database = process.env.DB_DATABASE || 'files_manager';
     this.client = new MongoClient(`mongodb://${this.host}:${this.port}`, {
       useUnifiedTopology: true,
     });
@@ -44,19 +44,19 @@ class DBClient {
   }
 
   nbUsers() {
-    return this.countDocuments("users");
+    return this.countDocuments('users');
   }
 
   nbFiles() {
-    return this.countDocuments("files");
+    return this.countDocuments('files');
   }
 
   isUserExist(email) {
-    return this.findOne("users", { email });
+    return this.findOne('users', { email });
   }
 
   async createUser(email, password) {
-    const result = await this.insertOne("users", {
+    const result = await this.insertOne('users', {
       email,
       password: sha1(password),
     });
@@ -64,32 +64,32 @@ class DBClient {
   }
 
   getUser(email) {
-    return this.findOne("users", { email });
+    return this.findOne('users', { email });
   }
 
   getUserById(userId) {
-    return this.findOne("users", { _id: new ObjectId(userId) });
+    return this.findOne('users', { _id: new ObjectId(userId) });
   }
 
   getFile(fileId) {
-    return this.findOne("files", { _id: new ObjectId(fileId) });
+    return this.findOne('files', { _id: new ObjectId(fileId) });
   }
 
   async getFilesForUser(userId, parentId) {
     const query = {
       userId: new ObjectId(userId),
-      parentId: parentId === "0" ? "0" : new ObjectId(parentId),
+      parentId: parentId === '0' ? '0' : new ObjectId(parentId),
     };
-    const files = await this.getCollection("files").find(query).toArray();
+    const files = await this.getCollection('files').find(query).toArray();
     return files;
   }
 
   async getPageFilesForUser(userId, parentId, page) {
     const query = {
       userId: new ObjectId(userId),
-      parentId: parentId === "0" ? "0" : new ObjectId(parentId),
+      parentId: parentId === '0' ? '0' : new ObjectId(parentId),
     };
-    const files = await this.getCollection("files")
+    const files = await this.getCollection('files')
       .find(query)
       .skip(page * 20)
       .limit(20)
@@ -97,15 +97,15 @@ class DBClient {
     return files;
   }
 
-  async createFile(name, type, userId, parentId = "0", isPublic = false) {
+  async createFile(name, type, userId, parentId = '0', isPublic = false) {
     const fileData = {
       name,
       type,
       userId: new ObjectId(userId),
-      parentId: parentId === "0" ? "0" : new ObjectId(parentId),
+      parentId: parentId === '0' ? '0' : new ObjectId(parentId),
       isPublic,
     };
-    const result = await this.insertOne("files", fileData);
+    const result = await this.insertOne('files', fileData);
     return { id: result.insertedId, ...fileData };
   }
 }
