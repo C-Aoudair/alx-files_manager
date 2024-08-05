@@ -17,6 +17,7 @@ class DBClient {
   async connect() {
     try {
       await this.client.connect();
+      console.log('DBClient connected');
       this.isConnected = true;
     } catch (error) {
       console.log(error);
@@ -75,6 +76,14 @@ class DBClient {
     return this.findOne('files', { _id: new ObjectId(fileId) });
   }
 
+  async getFileForUser(userId, fileId) {
+    const query = {
+      _id: new ObjectId(fileId),
+      userId: new ObjectId(userId),
+    };
+    return this.findOne('files', query);
+  }
+
   async getFilesForUser(userId, parentId) {
     const query = {
       userId: new ObjectId(userId),
@@ -107,6 +116,22 @@ class DBClient {
     };
     const result = await this.insertOne('files', fileData);
     return { id: result.insertedId, ...fileData };
+  }
+
+  async publishFile(fileId) {
+    const query = { _id: new ObjectId(fileId) };
+    const newValues = { $set: { isPublic: true } };
+    await this.getCollection('files').updateOne(query, newValues);
+
+    return this.getFile(fileId);
+  }
+
+  async unPublishFile(fileId) {
+    const query = { _id: new ObjectId(fileId) };
+    const newValues = { $set: { isPublic: false } };
+    await this.getCollection('files').updateOne(query, newValues);
+
+    return this.getFile(fileId);
   }
 }
 
