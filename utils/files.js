@@ -1,7 +1,7 @@
 import { promises as fs, existsSync } from "fs";
 import { v4 as uuidv4 } from "uuid";
 
-class FilesManager {
+export class FilesManager {
   static path = process.env.FOLDER_PATH || "/tmp/files_manager";
 
   static async createFile(data) {
@@ -15,8 +15,19 @@ class FilesManager {
 
     await fs.writeFile(filePath, bufferData);
 
-    return { filePath };
+    return filePath;
+  }
+
+  static async readFile(fileId) {
+    const filePath = `${FilesManager.path}/${fileId}`;
+    if (!existsSync(filePath)) {
+      return -1;
+    }
+    try {
+      const data = await fs.readFile(filePath);
+      return { data };
+    } catch (error) {
+      return { error: "Cannot read the file" };
+    }
   }
 }
-
-export default FilesManager;

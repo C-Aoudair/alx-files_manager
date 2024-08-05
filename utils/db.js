@@ -106,16 +106,24 @@ class DBClient {
     return files;
   }
 
-  async createFile(name, type, userId, parentId = '0', isPublic = false) {
+  async createFile(fileInfo) {
     const fileData = {
-      name,
-      type,
-      userId: new ObjectId(userId),
-      parentId: parentId === '0' ? '0' : new ObjectId(parentId),
-      isPublic,
+      name: fileInfo.name,
+      type: fileInfo.type,
+      userId: new ObjectId(fileInfo.userId),
+      parentId: fileInfo.parentId === '0' ? '0' : new ObjectId(fileInfo.parentId),
+      isPublic: fileInfo.isPublic,
+      localPath: fileInfo.localPath,
     };
     const result = await this.insertOne('files', fileData);
-    return { id: result.insertedId, ...fileData };
+    return { 
+      id: result.insertedId.toString(),
+      userId: fileInfo.userId,
+      name: fileInfo.name,
+      type: fileInfo.type,
+      isPublic: fileInfo.isPublic,
+      parentId: fileInfo.parentId,
+     };
   }
 
   async publishFile(fileId) {
