@@ -90,7 +90,17 @@ class DBClient {
       parentId: parentId === '0' ? '0' : new ObjectId(parentId),
     };
     const files = await this.getCollection('files').find(query).toArray();
-    return files;
+    const newFiles = files.map((file) => {
+      return {
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      }
+    })
+    return newFiles;
   }
 
   async getPageFilesForUser(userId, parentId, page) {
@@ -103,7 +113,18 @@ class DBClient {
       .skip(page * 20)
       .limit(20)
       .toArray();
-    return files;
+    
+    const newFiles = files.map((file) => {
+      return {
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      }
+    });
+    return newFiles;
   }
 
   async createFile(fileInfo) {

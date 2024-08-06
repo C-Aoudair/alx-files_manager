@@ -18,8 +18,7 @@ export class FilesManager {
     return filePath;
   }
 
-  static async readFile(fileId) {
-    const filePath = `${FilesManager.path}/${fileId}`;
+  static async readFile(filePath) {
     if (!existsSync(filePath)) {
       return -1;
     }
