@@ -2,6 +2,7 @@ import mime from 'mime-types';
 import redisClient from '../utils/redis';
 import dbClient from '../utils/db';
 import { FilesManager } from '../utils/files';
+import Bull from 'bull';
 
 class FilesController {
   static async postUpload(req, res) {
@@ -37,8 +38,14 @@ class FilesController {
       const localPath = await FilesManager.createFile(data);
       fileData.localPath = localPath;
     }
-
     const result = await dbClient.createFile(fileData);
+    if (type === 'image') {
+      const producer =  new Bull('fileQueue');
+      await producer.add({
+        fileId: result.id,
+        userId: result.userId,
+      });
+    }
     return res.status(201).json(result);
   }
 
@@ -120,10 +127,10 @@ class FilesController {
 
     if (file.type === 'folder') return res.status(400).json({ error: "A folder doesn't have content" });
 
-    const fileData = await FilesManager.readFile(file.localPath);
-    if (fileData === -1) return res.status(404).json({ error: 'Not found' });
+    const bufferData = await FilesManager.readFile(file.localPath);
+    if (bufferData === -1) return res.status(404).json({ error: 'Not found' });
 
-    return res.status(200).type(mime.lookup(file.name)).send(fileData.data);
+    return res.status(200).type(mime.lookup(file.name)).send(bufferData);
   }
 }
 
