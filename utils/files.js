@@ -1,5 +1,4 @@
 import { promises as fs, existsSync } from "fs";
-import { encode } from "punycode";
 import { v4 as uuidv4 } from "uuid";
 
 export class FilesManager {
@@ -14,19 +13,20 @@ export class FilesManager {
 
     const bufferData = Buffer.from(data, "base64");
 
-    await fs.writeFile(filePath, bufferData);
-
-    return filePath;
+    try {
+      await fs.writeFile(filePath, bufferData);
+      return filePath;
+    } catch (error) {
+      return { error: "Failed to create the file" };
+    }
   }
 
   static async readFile(filePath) {
-    console.log(" I saw you")
     if (!existsSync(filePath)) {
-      return -1;
+      return { error: "File does not exist" };
     }
     try {
       const bufferData = await fs.readFile(filePath);
-      console.log("I read the file")
       return bufferData;
     } catch (error) {
       return { error: "Cannot read the file" };

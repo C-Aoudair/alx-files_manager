@@ -5,16 +5,24 @@ import { FilesManager } from '../utils/files';
 import Bull from 'bull';
 
 class FilesController {
-  static async postUpload(req, res) {
+  static async validateToken(req, res) {
     const token = req.headers['x-token'];
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
     const userId = await redisClient.get(`auth_${token}`);
     if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
+    return userId;
+  }
+
+  static async postUpload(req, res) {
+    const userId = await FilesController.validateToken(req, res);
+    if (!userId) return;
+
     const {
       name, type, parentId, data, isPublic,
     } = req.body;
+
     if (!name) return res.status(400).json({ error: 'Missing name' });
     if (!type || !['folder', 'file', 'image'].includes(type)) return res.status(400).json({ error: 'Invalid type' });
 
@@ -39,22 +47,17 @@ class FilesController {
       fileData.localPath = localPath;
     }
     const result = await dbClient.createFile(fileData);
+
     if (type === 'image') {
-      const producer =  new Bull('fileQueue');
-      await producer.add({
-        fileId: result.id,
-        userId: result.userId,
-      });
+      const producer = new Bull('fileQueue');
+      await producer.add({ fileId: result.id, userId: result.userId });
     }
     return res.status(201).json(result);
   }
 
   static async getShow(req, res) {
-    const token = req.headers['x-token'];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
-    const userId = await redisClient.get(`auth_${token}`);
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = await FilesController.validateToken(req, res);
+    if (!userId) return;
 
     const { id } = req.params;
     const file = await dbClient.getFileForUser(userId, id);
@@ -64,33 +67,22 @@ class FilesController {
   }
 
   static async getIndex(req, res) {
-    const token = req.headers['x-token'];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
-    const userId = await redisClient.get(`auth_${token}`);
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = await FilesController.validateToken(req, res);
+    if (!userId) return;
 
     const parentId = req.query.parentId || '0';
     const { page } = req.query;
 
-    if (page) {
-      const pageData = await dbClient.getPageFilesForUser(
-        userId,
-        parentId,
-        page,
-      );
-      return res.status(200).json(pageData);
-    }
-    const files = await dbClient.getFilesForUser(userId, parentId);
+    const files = page
+      ? await dbClient.getPageFilesForUser(userId, parentId, page)
+      : await dbClient.getFilesForUser(userId, parentId);
+
     return res.status(200).json(files);
   }
 
   static async putPublish(req, res) {
-    const token = req.headers['x-token'];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
-    const userId = await redisClient.get(`auth_${token}`);
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = await FilesController.validateToken(req, res);
+    if (!userId) return;
 
     const { id } = req.params;
     const file = await dbClient.getFileForUser(userId, id);
@@ -101,11 +93,8 @@ class FilesController {
   }
 
   static async putUnpublish(req, res) {
-    const token = req.headers['x-token'];
-    if (!token) return res.status(401).json({ error: 'Unauthorized' });
-
-    const userId = await redisClient.get(`auth_${token}`);
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    const userId = await FilesController.validateToken(req, res);
+    if (!userId) return;
 
     const { id } = req.params;
     const file = await dbClient.getFileForUser(userId, id);
@@ -123,11 +112,18 @@ class FilesController {
     const token = req.headers['x-token'];
     const userId = token ? await redisClient.get(`auth_${token}`) : '0';
 
-    if (!file.isPublic && file.userId.toString() !== userId) return res.status(403).json({ error: 'Not found' });
+    if (!file.isPublic && file.userId.toString() !== userId) return res.status(403).json({ error: 'Forbidden' });
 
     if (file.type === 'folder') return res.status(400).json({ error: "A folder doesn't have content" });
+    
+    let filePath = file.localPath;
+    const { size } = req.query;
 
-    const bufferData = await FilesManager.readFile(file.localPath);
+    if (size && ['250', '500', '100'].includes(size)) {
+      filePath = `${file.localPath}_${size}`;
+    }
+
+    const bufferData = await FilesManager.readFile(filePath);
     if (bufferData === -1) return res.status(404).json({ error: 'Not found' });
 
     return res.status(200).type(mime.lookup(file.name)).send(bufferData);

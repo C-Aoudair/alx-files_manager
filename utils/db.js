@@ -3,6 +3,10 @@ import sha1 from 'sha1';
 
 class DBClient {
   constructor() {
+    if (DBClient.instance) {
+      return DBClient.instance;
+    }
+
     this.isConnected = false;
     this.host = process.env.DB_HOST || 'localhost';
     this.port = process.env.DB_PORT || 27017;
@@ -12,6 +16,7 @@ class DBClient {
     });
 
     this.connect();
+    DBClient.instance = this;
   }
 
   async connect() {
@@ -20,7 +25,8 @@ class DBClient {
       console.log('DBClient connected');
       this.isConnected = true;
     } catch (error) {
-      console.log(error);
+      console.error('Error connecting to database:', error);
+      this.isConnected = false;
     }
   }
 
@@ -44,15 +50,15 @@ class DBClient {
     return this.getCollection(collectionName).insertOne(document);
   }
 
-  nbUsers() {
+  async nbUsers() {
     return this.countDocuments('users');
   }
 
-  nbFiles() {
+  async nbFiles() {
     return this.countDocuments('files');
   }
 
-  isUserExist(email) {
+  async isUserExist(email) {
     return this.findOne('users', { email });
   }
 
@@ -64,15 +70,15 @@ class DBClient {
     return { id: result.insertedId, email };
   }
 
-  getUser(email) {
+  async getUser(email) {
     return this.findOne('users', { email });
   }
 
-  getUserById(userId) {
+  async getUserById(userId) {
     return this.findOne('users', { _id: new ObjectId(userId) });
   }
 
-  getFile(fileId) {
+  async getFile(fileId) {
     return this.findOne('files', { _id: new ObjectId(fileId) });
   }
 
@@ -90,17 +96,14 @@ class DBClient {
       parentId: parentId === '0' ? '0' : new ObjectId(parentId),
     };
     const files = await this.getCollection('files').find(query).toArray();
-    const newFiles = files.map((file) => {
-      return {
-        id: file._id,
-        userId: file.userId,
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId,
-      }
-    })
-    return newFiles;
+    return files.map(file => ({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    }));
   }
 
   async getPageFilesForUser(userId, parentId, page) {
@@ -113,18 +116,14 @@ class DBClient {
       .skip(page * 20)
       .limit(20)
       .toArray();
-    
-    const newFiles = files.map((file) => {
-      return {
-        id: file._id,
-        userId: file.userId,
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId,
-      }
-    });
-    return newFiles;
+    return files.map(file => ({
+      id: file._id,
+      userId: file.userId,
+      name: file.name,
+      type: file.type,
+      isPublic: file.isPublic,
+      parentId: file.parentId,
+    }));
   }
 
   async createFile(fileInfo) {
@@ -137,21 +136,20 @@ class DBClient {
       localPath: fileInfo.localPath,
     };
     const result = await this.insertOne('files', fileData);
-    return { 
+    return {
       id: result.insertedId.toString(),
       userId: fileInfo.userId,
       name: fileInfo.name,
       type: fileInfo.type,
       isPublic: fileInfo.isPublic,
       parentId: fileInfo.parentId,
-     };
+    };
   }
 
   async publishFile(fileId) {
     const query = { _id: new ObjectId(fileId) };
     const newValues = { $set: { isPublic: true } };
     await this.getCollection('files').updateOne(query, newValues);
-
     return this.getFile(fileId);
   }
 
@@ -159,7 +157,6 @@ class DBClient {
     const query = { _id: new ObjectId(fileId) };
     const newValues = { $set: { isPublic: false } };
     await this.getCollection('files').updateOne(query, newValues);
-
     return this.getFile(fileId);
   }
 }

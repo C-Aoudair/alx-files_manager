@@ -14,24 +14,34 @@ class AuthController {
 
     if (!email || !password) return res.status(401).json({ error: 'Unauthorized' });
 
-    const user = await dbClient.getUser(email);
-    if (!user || user.password !== sha1(password)) { return res.status(401).json({ error: 'Unauthorized' }); }
+    try {
+      const user = await dbClient.getUser(email);
+      if (!user || user.password !== sha1(password)) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
 
-    const token = uuidv4();
-    await redisClient.set(`auth_${token}`, user._id.toString(), 86400);
+      const token = uuidv4();
+      await redisClient.set(`auth_${token}`, user._id.toString(), 86400);
 
-    return res.status(200).json({ token });
+      return res.status(200).json({ token });
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to authenticate' });
+    }
   }
 
   static async getDisconnect(req, res) {
     const token = req.headers['x-token'];
     if (!token) return res.status(401).json({ error: 'Unauthorized' });
 
-    const userId = await redisClient.get(`auth_${token}`);
-    if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const userId = await redisClient.get(`auth_${token}`);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-    await redisClient.del(`auth_${token}`);
-    return res.status(204).send();
+      await redisClient.del(`auth_${token}`);
+      return res.status(204).send();
+    } catch (error) {
+      return res.status(500).json({ error: 'Failed to log out' });
+    }
   }
 }
 
